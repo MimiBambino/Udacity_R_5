@@ -1,0 +1,277 @@
+Lesson 5
+========================================================
+
+### Third Qualitative Variable
+Notes:
+
+```{r Third Qualitative Variable}
+library(ggplot2)
+pf = read.csv('pseudo_facebook.tsv', sep = '\t')
+
+ggplot(aes(x = gender, y = age),
+       data = subset(pf, !is.na(gender))) + geom_boxplot() +
+  stat_summary(fun.y = mean, geom = 'point', shape = 4)
+
+```
+
+***
+
+### Plotting Conditional Summaries
+Plot friend count for ages grouped by gender.  Then create a new dataframe that contains the same information.
+
+```{r Plotting Conditional Summaries}
+ggplot(aes(x=age, y=friend_count),
+       data=subset(pf, !is.na(gender))) + 
+  geom_line(aes(color = gender), stat = 'summary', fun.y = median)
+
+library(dplyr)
+
+pf.fc_by_age_gender = pf %>%
+  filter(!is.na(gender)) %>%
+  group_by(age, gender) %>%
+  summarise(mean_friend_count = mean(friend_count),
+            median_friend_count = median(as.numeric(friend_count)),
+            n = n())
+
+head(pf.fc_by_age_gender)
+
+ggplot(aes(x=age, y=median_friend_count), 
+           data = pf.fc_by_age_gender) +
+  geom_line(aes(color = gender))
+```
+
+***
+
+### Wide and Long Format
+Long data has few columns some of which have only a couple of levels.
+
+Wide data has fewer rows, but more columns because each column with a binary set of levels in long format is represented by two columns in the wide format.
+***
+
+### Reshaping Data
+Notes:
+
+```{r}
+library(reshape2)
+
+pf.fc_by_age_gender.wide = dcast(pf.fc_by_age_gender, 
+                                 age ~ gender,
+                                 value.var = "median_friend_count")
+
+head(pf.fc_by_age_gender.wide)
+```
+
+
+***
+
+### Ratio Plot
+Plot the ratio of female to male friend counts.
+
+```{r Ratio Plot}
+ggplot(aes(x=age, y=female/male), 
+           data = pf.fc_by_age_gender.wide) +
+  geom_line() +
+  geom_hline(yintercept=1, alpha=0.3, linetype=2)
+```
+This plot show us that young females have twice as many friends as males and the for most ages, females have more friends than males.
+***
+
+### Third Quantitative Variable
+We add length of tenure of use as a third variable.  To do that, we add a new variable `year_joined` to the dataframe.
+
+```{r Third Quantitative Variable}
+pf$year_joined = 2014 - ceiling(pf$tenure /365)
+summary(pf$year_joined)
+table(pf$year_joined)
+```
+
+***
+
+### Cut a Variable
+Notes:
+Create bins of users based on year joined.  We are turning our numeric variable to a categorical variable. This also works with continuous variables.
+```{r Cut a Variable}
+pf$year_joined.bucket <- cut(pf$year_joined, 
+                          c(2004, 2009, 2011, 2012, 2014))
+table(pf$year_joined.bucket, useNA = 'ifany')
+```
+
+***
+
+### Plotting it All Together
+Now plot the new categorical variable, year_joined.bucket.
+
+```{r Plotting it All Together}
+ggplot(aes(x=age, y=friend_count),
+           data=subset(pf, !is.na(year_joined.bucket))) +
+  geom_line(aes(color = year_joined.bucket), 
+            stat='summary', fun.y = median)
+```
+This plot shows that users with longer tenures generally mave higher friend counts.
+***
+
+### Plot the Grand Mean
+Add the mean across all users regardless of tenure.
+
+```{r Plot the Grand Mean}
+ggplot(aes(x=age, y=friend_count),
+           data=subset(pf, !is.na(year_joined.bucket))) +
+  geom_line(aes(color = year_joined.bucket), 
+            stat='summary', fun.y = mean) +
+  geom_line(stat='summary', fun.y = mean, linetype=2)
+```
+
+***
+
+### Friending Rate
+Create a summary for how many friends a use has for each day of tenure.
+
+```{r Friending Rate}
+with(subset(pf, tenure >= 1), summary(friend_count / tenure))
+```
+
+***
+Plot the rate of friendships initiated and color by tenure buckets.
+```{r Friendships Initiated}
+ggplot(aes(x = tenure, y = friendships_initiated / tenure),
+       data = subset(pf, tenure >= 1)) +
+  geom_line(aes(color = year_joined.bucket))
+```
+
+***
+
+### Bias-Variance Tradeoff Revisited
+A lot more on [Bias-Variance](http://scott.fortmann-roe.com/docs/BiasVariance.html).
+
+```{r Bias-Variance Tradeoff Revisited}
+
+ggplot(aes(x = tenure, y = friendships_initiated / tenure),
+       data = subset(pf, tenure >= 1)) +
+  geom_line(aes(color = year_joined.bucket),
+            stat = 'summary',
+            fun.y = mean)
+
+ggplot(aes(x = 7 * round(tenure / 7), y = friendships_initiated / tenure),
+       data = subset(pf, tenure > 0)) +
+  geom_line(aes(color = year_joined.bucket),
+            stat = "summary",
+            fun.y = mean)
+
+ggplot(aes(x = 30 * round(tenure / 30), y = friendships_initiated / tenure),
+       data = subset(pf, tenure > 0)) +
+  geom_line(aes(color = year_joined.bucket),
+            stat = "summary",
+            fun.y = mean)
+
+ggplot(aes(x = 90 * round(tenure / 90), y = friendships_initiated / tenure),
+       data = subset(pf, tenure > 0)) +
+  geom_line(aes(color = year_joined.bucket),
+            stat = "summary",
+            fun.y = mean)
+
+```
+
+***
+
+### Introducing the Yogurt Data Set
+An article on [Scanner Data and Consumer Demand](http://www.nuff.ox.ac.uk/Economics/papers/2013/Panel%20Data%20Demand%20-%20June%2020,%202013.pdf)
+
+***
+
+### Histograms Revisited
+Notes:
+
+```{r Histograms Revisited}
+yo = read.csv('yogurt.csv')
+str(yo)
+
+# Change the id from an int to a factor
+yo$id = factor(yo$id)
+str(yo)
+
+ggplot(aes(x = price), data = yo) + 
+  geom_histogram(color = 'black', fill = '#F79420') 
+```
+***
+
+### Number of Purchases
+The price data seems to be fairly discrete.
+
+```{r Number of Purchases}
+summary(yo)
+length(unique(yo$price))
+table(yo$price)
+
+yo = transform(yo, all.purchases = strawberry + blueberry + pina.colada + plain + mixed.berry)
+
+qplot(x=all.purchases, data = yo, binwidth = 1,
+      fill=I('#099DD9'))
+```
+
+***
+
+### Prices over Time
+Notes:
+
+```{r Prices over Time}
+ggplot(aes(x=time, y=price), data = yo) +
+  geom_jitter(alpha=1/4, shape=21, fill=I('#F79420'))
+```
+
+***
+
+### Sampling Observations
+When using data that has multiple observations over time, it is useful to sample some of the observations.  This can help to determine within goup and between group variability.
+
+***
+
+### Looking at Samples of Households
+This plot shows the price paid of certain households over time.  The size of the points show number of purchases on each occasion.
+```{r Looking at Sample of Households}
+set.seed(4230)
+sample.ids = sample(levels(yo$id), 16)
+
+ggplot(aes(x=time, y=price),
+       data = subset(yo, id %in% sample.ids)) +
+  facet_wrap( ~ id) +
+  geom_line() +
+  geom_point(aes(size = all.purchases), pch=1)
+
+```
+
+***
+
+### Scatterplot Matrix
+Creates a grid of scatterplots between each of the variables.
+
+```{r}
+library(GGally)
+theme_set(theme_minimal(20))
+
+set.seed(1836)
+pf_subset = pf[, c(2:15)]
+names(pf_subset)
+ggpairs(pf_subset[sample.int(nrow(pf_subset), 1000),])
+```
+
+***
+
+### Heat Maps
+Notes:
+
+```{r}
+nci <- read.table("nci.tsv")
+colnames(nci) <- c(1:64)
+```
+
+```{r}
+library(reshape2)
+nci.long.samp <- melt(as.matrix(nci[1:200,]))
+names(nci.long.samp) <- c("gene", "case", "value")
+head(nci.long.samp)
+
+ggplot(aes(y = gene, x = case, fill = value),
+  data = nci.long.samp) +
+  geom_tile() +
+  scale_fill_gradientn(colours = colorRampPalette(c("blue", "red"))(100))
+```
